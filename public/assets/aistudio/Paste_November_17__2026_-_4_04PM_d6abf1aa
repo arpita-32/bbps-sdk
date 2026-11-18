@@ -1,0 +1,1000 @@
+# =============================================================================
+# Bharat Connect (BBPS) SDK — Gherkin Feature File
+# Embedded bill payment experience for partner banks
+# Scope: SDK init | Logo rules | Home | Fetch & Pay | Payment result | My Billers |
+#        Payments | Complaints | Non-functional
+# Version: v1.0 | Author: Product Team
+# Note: "Screen" means a generic SDK screen. Host banks may style colours, fonts
+#       and navigation, but NOT the Bharat Connect / B Assured brand assets.
+# =============================================================================
+
+# References:
+#   - NPCI Bharat Connect Brand Guidelines (logo, B Assured, sonic branding, receipts)
+#   - Reference implementation screens (Home, My Billers, Payments, Complaints)
+#
+# Brand specification used in this file (from NPCI guidelines):
+#   Stage 1 : "B" mnemonic at the entry point of the bill payment section (host app)
+#   Stage 2 : Bharat Connect horizontal logo on Selection of Biller, Bill Fetch, Bill Payment,
+#             Transaction Status History and Complaint Management screens
+#             - top right-hand corner, minimum height 20 px
+#   Stage 3 : B Assured logo on payment confirmation page and receipt (digital + physical)
+#             - minimum height 30 px, white background on confirmation page
+#             - online receipt: top left | paper receipt: top right (30 mm)
+#   Sonic   : designated audio clip played simultaneously with B Assured on the
+#             "Payment Successful" screen
+#   Receipt : must show B-Connect Txn ID and Consumer Convenience Fee (CCF)
+#   Layout  : designs referenced at 320 px (mobile) and 1024 px (web)
+
+
+# =============================================================================
+# FEATURE 1: SDK initialisation, configuration and host integration
+# =============================================================================
+
+Feature: SDK initialisation, configuration and host integration
+  As a partner bank embedding the Bharat Connect SDK
+  I want the SDK to initialise correctly, accept my configuration and integrate cleanly with my host application
+  So that my customers can use bill payment securely inside my app while the NPCI brand assets stay protected
+
+  Background:
+    Given the host application has integrated the Bharat Connect SDK
+    And the SDK has been initialised with a valid partner configuration
+    And the SDK has received a valid authenticated customer session from the host application
+
+  Scenario: SDK initialises successfully with valid configuration
+    Given the host provides partner ID, environment, customer identifier and session token
+    When the host application launches the Bharat Connect SDK
+    Then the SDK should open the Home module
+    And the SDK should not expose any customer data to the host beyond the defined callbacks
+
+  Scenario Outline: SDK refuses to start with invalid configuration
+    Given the host provides "<invalid_input>"
+    When the host application launches the Bharat Connect SDK
+    Then the SDK should not open any screen
+    And the SDK should return error code "<error_code>" to the host callback
+
+    Examples:
+      | invalid_input           | error_code           |
+      | missing partner ID      | ERR_INVALID_PARTNER  |
+      | expired session token   | ERR_SESSION_EXPIRED  |
+      | unsupported environment | ERR_INVALID_ENV      |
+      | missing customer ID     | ERR_INVALID_CUSTOMER |
+
+  Scenario: Host bank applies its own theme without altering brand assets
+    Given the host supplies a theme with primary colour, font family and bank logo
+    When the SDK renders any screen
+    Then buttons, headers and text should use the host theme
+    And the host bank logo should be displayed in the header area
+    And the Bharat Connect logo should be rendered from the SDK bundled asset
+    And the Bharat Connect logo should not be recolored, stretched, cropped, rotated or re-typeset
+
+  Scenario: Host cannot override Bharat Connect or B Assured assets
+    Given the host supplies a custom image as the Bharat Connect logo
+    When the SDK is initialised
+    Then the SDK should ignore the custom image
+    And the SDK should continue to use the official Bharat Connect and B Assured assets
+
+  Scenario Outline: SDK notifies the host about key events
+    When the "<event>" occurs inside the SDK
+    Then the SDK should invoke the host callback "<callback>" with the event payload
+
+    Examples:
+      | event                  | callback          |
+      | payment completed      | onPaymentResult   |
+      | biller added           | onBillerAdded     |
+      | biller deleted         | onBillerDeleted   |
+      | complaint raised       | onComplaintRaised |
+      | customer exits the SDK | onSDKClosed       |
+      | session expired        | onSessionExpired  |
+
+  Scenario: Customer session expires while using the SDK
+    Given the customer is on any SDK screen
+    When the host session token expires
+    Then the SDK should show a "Session expired" message
+    And the SDK should call "onSessionExpired" so the host can re-authenticate
+    And the SDK should not allow further actions until a new token is provided
+
+  Scenario Outline: Host entry point uses the B mnemonic (Stage 1)
+    Given the host application shows a bill payment entry on its "<surface>"
+    When the entry tile or menu item is rendered
+    Then it should display the B mnemonic from the SDK brand asset kit
+    And the label should be one of "Bill Payments", "Pay Bills" or "Bill Pay"
+    And the B mnemonic should be prominent and commensurate with other entries in the host design
+
+    Examples:
+      | surface                         |
+      | mobile app home grid            |
+      | mobile app with dark background |
+      | website dropdown menu           |
+      | net-banking landing page        |
+
+  Scenario Outline: SDK renders correctly on supported form factors
+    Given the SDK is launched on a "<device>" with viewport width "<width>"
+    When any SDK screen is displayed
+    Then the layout should adapt without horizontal scrolling
+    And all primary actions should remain visible and tappable
+
+    Examples:
+      | device        | width   |
+      | mobile        | 320 px  |
+      | tablet        | 768 px  |
+      | web / desktop | 1024 px |
+
+
+# =============================================================================
+# FEATURE 2: Bharat Connect logo (Stage 2) rendering rules across SDK screens
+# =============================================================================
+
+Feature: Bharat Connect logo (Stage 2) rendering rules across SDK screens
+  As a partner bank embedding the Bharat Connect SDK
+  I want the Bharat Connect logo to be displayed consistently on the mandated screens
+  So that my integration stays compliant with the NPCI Bharat Connect brand guidelines
+
+  Background:
+    Given the host application has integrated the Bharat Connect SDK
+    And the SDK has been initialised with a valid partner configuration
+    And the SDK has received a valid authenticated customer session from the host application
+
+  Scenario Outline: Bharat Connect logo is shown on mandatory screens
+    When the customer opens the "<screen>" screen
+    Then the Bharat Connect horizontal logo should be displayed
+    And the logo should be positioned in the top right-hand corner
+    And the logo should be clearly visible against the header background
+
+    Examples:
+      | screen                     |
+      | Selection of Biller        |
+      | Bill Fetch                 |
+      | Bill Payment               |
+      | Transaction Status History |
+      | Raise Complaint            |
+      | Complaint Status           |
+
+  Scenario Outline: Bharat Connect logo respects minimum size
+    Given the SDK is rendered on "<device>"
+    When the Bharat Connect logo is displayed
+    Then its rendered height should be at least 20 px
+    And its aspect ratio should be preserved
+
+    Examples:
+      | device |
+      | mobile |
+      | tablet |
+      | web    |
+
+  Scenario: Logo remains visible when host header is small
+    Given the host header area is shorter than the minimum logo size
+    When the SDK renders a screen with the Bharat Connect logo
+    Then the SDK should enlarge the header or reposition the logo so the 20 px minimum is met
+    And the logo should never be hidden, clipped or overlapped by other elements
+
+  Scenario: Vertical logo not permitted by host design guidelines
+    Given the host design guidelines do not allow the vertical logo
+    When the SDK renders a Stage 2 screen
+    Then the SDK should use the Bharat Connect horizontal logo
+
+  Scenario: Logo is shown in the correct variant on dark backgrounds
+    Given the host uses a dark header background
+    When the SDK renders the Bharat Connect logo
+    Then the SDK should use the approved dark-background variant with sufficient contrast
+
+
+# =============================================================================
+# FEATURE 3: Home module - biller categories, registered billers and search
+# =============================================================================
+
+Feature: Home module - biller categories, registered billers and search
+  As a customer using the Bharat Connect SDK
+  I want to see biller categories, my registered billers and a search option on the Home screen
+  So that I can quickly find a biller and start paying my bill
+
+  Background:
+    Given the host application has integrated the Bharat Connect SDK
+    And the SDK has been initialised with a valid partner configuration
+    And the SDK has received a valid authenticated customer session from the host application
+
+  Scenario: Home screen displays navigation, categories and registered billers
+    When the customer opens the Home module
+    Then the SDK should display the navigation to "Home", "My Billers", "Payments" and "Complaints"
+    And the SDK should display an "Add Biller" button
+    And the SDK should display a search box for billers
+    And the SDK should display the list of biller categories as tiles with icons
+    And the Bharat Connect logo should be visible in the top right-hand corner
+
+  Scenario: Registered billers are listed on Home with pending bills
+    Given the customer has registered billers
+    When the Home screen loads
+    Then the SDK should list each registered biller with serial number, biller name, authenticator and pending bill amount
+    And each row should have a "Fetch" action
+    And the list should be paginated with a rows-per-page selector
+
+  Scenario: Home screen when the customer has no registered billers
+    Given the customer has no registered billers
+    When the Home screen loads
+    Then the SDK should show an empty state with a message to add a biller
+    And the category tiles should still be displayed
+
+  Scenario Outline: Biller categories are displayed as defined by the Bharat Connect biller master
+    When the Home screen loads
+    Then the category "<category>" should be available as a tile
+
+    Examples:
+      | category           |
+      | Electricity        |
+      | Water              |
+      | Gas                |
+      | Mobile Postpaid    |
+      | Mobile Prepaid     |
+      | DTH                |
+      | Broadband Postpaid |
+      | Landline Postpaid  |
+      | Credit Card        |
+      | Loan Repayment     |
+      | Insurance          |
+      | FASTag             |
+      | Municipal Taxes    |
+      | Education Fees     |
+
+  Scenario: Categories are driven by the central biller master
+    Given a new biller category is enabled in the biller master
+    When the Home screen loads
+    Then the new category should appear without requiring an SDK upgrade
+
+  Scenario: Search a biller from the Home screen
+    Given the customer is on the Home screen
+    When the customer types "air" in the biller search box
+    Then the SDK should show only billers whose names contain "air"
+    And the search should be case-insensitive
+
+  Scenario: Search returns no result
+    When the customer searches for a biller name that does not exist
+    Then the SDK should show a "No billers found" message
+
+  Scenario: Selecting a category opens biller selection (Stage 2)
+    When the customer taps the "Credit Card" category tile
+    Then the SDK should open the Selection of Biller screen
+    And the screen title should show "Credit Card"
+    And the Bharat Connect logo should be displayed in the top right-hand corner
+    And a back control should return the customer to Home
+
+  Scenario: Biller dropdown supports search within a category
+    Given the customer is on the Selection of Biller screen for "Credit Card"
+    When the customer opens the biller dropdown and types a biller name
+    Then the dropdown should filter to matching billers
+    And each biller should show its name and logo
+
+  Scenario: Category has no billers available
+    Given a category has no active billers
+    When the customer opens that category
+    Then the SDK should show "No billers available for this category"
+
+
+# =============================================================================
+# FEATURE 4: Fetch bill and pay flow (Selection of Biller, Bill Fetch, Bill Payment)
+# =============================================================================
+
+Feature: Fetch bill and pay flow (Selection of Biller, Bill Fetch, Bill Payment)
+  As a customer using the Bharat Connect SDK
+  I want to fetch my bill, review it and pay it from my preferred account
+  So that I can complete my bill payment securely and without errors
+
+  Background:
+    Given the host application has integrated the Bharat Connect SDK
+    And the SDK has been initialised with a valid partner configuration
+    And the SDK has received a valid authenticated customer session from the host application
+
+  Scenario: Customer parameter form is generated from biller metadata
+    Given the customer has selected a biller
+    When the customer parameter screen loads
+    Then the SDK should render input fields exactly as defined in the biller MDM
+    And mandatory fields should be marked as required
+    And each field should apply the data type, length and regex validation from the MDM
+    And the Bharat Connect logo should be displayed in the top right-hand corner
+
+  Scenario: Consent note is displayed before fetching
+    Given the customer is on the customer parameter screen
+    Then the SDK should display a consent note stating that proceeding registers the biller and authorises fetching of current and future bills
+    And the note should state that consent can be withdrawn by deleting the biller from My Billers
+
+  Scenario: Successful bill fetch
+    Given the customer has entered valid customer parameters
+    When the customer taps "Fetch"
+    Then the SDK should call the Bharat Connect fetch request
+    And the SDK should show a bill details view with bill amount, due date, customer name and bill number
+    And the view should provide "Cancel" and "Confirm & Pay" actions
+    And the Bharat Connect logo should be displayed in the top right-hand corner
+
+  Scenario Outline: Validation errors on customer parameters
+    Given the customer is on the customer parameter screen
+    When the customer enters "<input>" in the field "<field>"
+    And the customer taps "Fetch"
+    Then the SDK should show the inline error "<message>"
+    And no fetch request should be sent
+
+    Examples:
+      | field                 | input | message                       |
+      | Registered Mobile No  |       | This field is required        |
+      | Registered Mobile No  | 12345 | Enter a valid 10 digit number |
+      | Last 4 digits of card | 12    | Enter exactly 4 digits        |
+      | Last 4 digits of card | abcd  | Only digits are allowed       |
+
+  Scenario: Bill fetch returns no pending bill
+    Given the biller returns "no dues"
+    When the customer taps "Fetch"
+    Then the SDK should show "No pending bill found"
+    And the SDK should not display the "Confirm & Pay" action
+
+  Scenario: Biller does not support fetch (quick pay / instapay)
+    Given the selected biller supports pay-without-fetch
+    When the customer enters the payment amount directly
+    Then the SDK should skip the bill details view
+    And proceed to the payment confirmation view
+
+  Scenario Outline: Bill fetch failures are handled gracefully
+    Given the customer taps "Fetch"
+    When the fetch fails with "<reason>"
+    Then the SDK should show the message "<message>"
+    And the customer should be able to retry or go back
+
+    Examples:
+      | reason                | message                                           |
+      | biller unavailable    | Biller is currently unavailable. Try again later. |
+      | invalid customer data | Details entered are incorrect. Please re-check.   |
+      | network timeout       | Request timed out. Please try again.              |
+
+  Scenario: Fetch for a registered biller directly from Home
+    Given the customer has a registered biller on the Home screen
+    When the customer taps "Fetch" against that biller
+    Then the SDK should show the bill details view without asking for customer parameters again
+    And the customer should be able to proceed with "Confirm & Pay"
+
+  Scenario: Payment configuration view
+    Given the customer has confirmed the fetched bill
+    When the SDK shows the payment view
+    Then the SDK should display biller name, "When to pay", payment amount, Consumer Convenience Fee and payment method
+    And the total payable amount should include the CCF and applicable taxes
+    And the Bharat Connect logo should be displayed in the top right-hand corner
+
+  Scenario Outline: Payment amount rules
+    Given the fetched bill amount is 1000
+    And the biller "<amount_rule>"
+    When the customer enters payment amount "<entered>"
+    Then the SDK should "<result>"
+
+    Examples:
+      | amount_rule                      | entered | result                              |
+      | allows only exact payment        | 1000    | accept the amount                   |
+      | allows only exact payment        | 500     | reject with "Exact amount required" |
+      | allows partial payment (min 200) | 500     | accept the amount                   |
+      | allows partial payment (min 200) | 100     | reject with "Below minimum amount"  |
+      | allows partial payment (min 200) | 1500    | reject with "Above bill amount"     |
+      | allows any amount                | 2000    | accept the amount                   |
+
+  Scenario: Customer selects the source account / payment method
+    Given the host provides the customer's eligible payment methods
+    When the customer opens the payment method list
+    Then the SDK should list masked accounts with available balance if shared by the host
+    And the customer should be able to select one
+
+  Scenario: Insufficient balance
+    Given the selected account balance is lower than the total payable amount
+    When the customer taps "Confirm & Pay"
+    Then the SDK should show "Insufficient balance"
+    And the payment should not be initiated
+
+  Scenario: Customer authorises the payment with OTP
+    Given the customer has tapped "Confirm & Pay"
+    When the SDK or host triggers the authentication step
+    Then an OTP verification view should show the masked mobile number
+    And the view should provide a 6 digit OTP input, "Cancel", "Submit" and a resend timer
+
+  Scenario Outline: OTP verification outcomes
+    Given the OTP verification view is displayed
+    When the customer "<action>"
+    Then the SDK should "<result>"
+
+    Examples:
+      | action                     | result                                    |
+      | enters the correct OTP     | submit the payment                        |
+      | enters a wrong OTP         | show "Invalid OTP" and allow retry        |
+      | enters a wrong OTP 3 times | block further attempts and close the view |
+      | lets the OTP expire        | enable "Resend OTP" and clear the input   |
+      | taps "Cancel"              | close the view and return to payment view |
+
+  Scenario: Resend OTP is available only after the timer ends
+    Given the OTP verification view is displayed
+    Then the "Resend OTP" action should be disabled until the countdown completes
+    When the countdown completes
+    Then the "Resend OTP" action should be enabled
+
+  Scenario: Duplicate payment is prevented
+    Given the customer has already submitted a payment for the same bill
+    When the customer taps "Confirm & Pay" again
+    Then the SDK should disable repeated submission while a request is in progress
+    And the SDK should show a message about the existing payment in progress
+
+  Scenario: Customer saves the biller during payment
+    Given the customer is on the payment view
+    When the customer selects the "Save to My Billers" option and completes the payment
+    Then the biller should be added to My Billers
+
+  Scenario Outline: Payment timing options
+    Given the customer is on the payment view
+    When the customer selects "When to pay" as "<timing>"
+    Then the SDK should "<behaviour>"
+
+    Examples:
+      | timing    | behaviour                                            |
+      | Pay Now   | process the payment immediately after authentication |
+      | Pay Later | ask for a date and schedule the payment              |
+
+
+# =============================================================================
+# FEATURE 5: Payment result - Stage 3 B Assured, sonic branding and receipts
+# =============================================================================
+
+Feature: Payment result - Stage 3 B Assured, sonic branding and receipts
+  As a customer who has attempted a bill payment
+  I want a clear result screen with the right brand marks and a receipt
+  So that I know the outcome of my payment and have proof of it
+
+  Background:
+    Given the host application has integrated the Bharat Connect SDK
+    And the SDK has been initialised with a valid partner configuration
+    And the SDK has received a valid authenticated customer session from the host application
+
+  Scenario: Successful payment confirmation shows B Assured logo
+    Given the payment is processed successfully
+    When the confirmation screen is displayed
+    Then the SDK should show a "Payment Successful" status
+    And the B Assured logo should be displayed on a white background
+    And the B Assured logo height should be at least 30 px
+    And the SDK should show payment amount, CCF, total amount, source reference number, B-Connect Txn ID, transaction reference number, transaction date and time, payment status, payment channel, payment method, biller status, biller ID, approval reference number and subscriber number
+
+  Scenario: Sonic branding plays with B Assured on success
+    Given the payment is successful
+    When the B Assured logo is displayed on the confirmation screen
+    Then the SDK should play the designated Bharat Connect sonic audio clip simultaneously
+    And the audio clip should be the unmodified file supplied by NPCI
+    And the tone, tempo and audio characteristics should be identical on every platform and device
+
+  Scenario Outline: Sonic branding handling for device audio states
+    Given the payment is successful
+    And the device is in "<audio_state>"
+    When the confirmation screen is displayed
+    Then the SDK should "<behaviour>"
+
+    Examples:
+      | audio_state               | behaviour                                       |
+      | normal volume             | play the sonic clip once                        |
+      | silent / muted            | not force volume and still display B Assured    |
+      | another app playing audio | briefly duck other audio and play the clip once |
+      | screen re-rendered        | not replay the clip                             |
+
+  Scenario: Sonic clip fails to load
+    Given the payment is successful
+    And the sonic audio asset cannot be loaded
+    When the confirmation screen is displayed
+    Then the SDK should still display the confirmation and the B Assured logo
+    And the SDK should log the audio failure without showing an error to the customer
+
+  Scenario Outline: B Assured and sonic branding are shown only for successful payments
+    Given the payment outcome is "<outcome>"
+    When the result screen is displayed
+    Then the B Assured logo should "<logo_behaviour>"
+    And the sonic clip should "<sonic_behaviour>"
+
+    Examples:
+      | outcome | logo_behaviour   | sonic_behaviour |
+      | success | be displayed     | be played       |
+      | failed  | not be displayed | not be played   |
+      | pending | not be displayed | not be played   |
+
+  Scenario: Failed payment screen
+    Given the payment fails
+    When the result screen is displayed
+    Then the SDK should show "Bill Payment Failed" with a failure indicator
+    And the SDK should show the payment details and failure status
+    And the SDK should offer "Cancel" and "Download" actions
+    And the customer should be able to retry the payment
+
+  Scenario: Pending payment screen
+    Given the payment status is not yet known
+    When the result screen is displayed
+    Then the SDK should show "Bill Payment Pending" with a pending indicator
+    And the SDK should tell the customer the status will be updated shortly
+    And the SDK should show the reference numbers needed to track the transaction
+
+  Scenario Outline: Pending payment is reconciled
+    Given a payment is in "Pending" status
+    When the final status is "<final_status>"
+    Then the transaction history should show status "<final_status>"
+    And the SDK should call "onPaymentResult" with "<final_status>"
+
+    Examples:
+      | final_status |
+      | Success      |
+      | Failed       |
+
+  Scenario: Network is lost after the payment request is submitted
+    Given the customer submitted a payment
+    When the network connection is lost before a response is received
+    Then the SDK should not show "Failed"
+    And the SDK should show "Payment status being confirmed"
+    And the SDK should check the status using the transaction reference when connectivity returns
+
+  Scenario: Online (digital) receipt layout
+    Given the payment is successful
+    When the customer views or downloads the digital receipt
+    Then the B Assured logo should be in the top left-hand corner of the receipt
+    And the receipt should show the title "Bharat Connect - Payment Confirmation"
+    And the receipt should show the B-Connect Txn ID
+    And the receipt should show the Consumer Convenience Fee (CCF), even if the value is 0.00
+    And the receipt should show biller name, bill number, bill date, due date, bill amount, total amount, payment mode, payment channel, transaction date and time and status
+
+  Scenario: Paper (physical) receipt layout
+    Given the host prints a receipt through a retail or assisted channel
+    When the SDK provides the printable receipt
+    Then the B Assured logo should be in the top right-hand corner
+    And the logo should be 30 mm in height on an A4 (210 mm) page
+    And the receipt should show the B-Connect Txn ID and the Consumer Convenience Fee (CCF)
+
+  Scenario Outline: Mandatory fields on every receipt
+    Given a receipt is generated in "<format>" format
+    Then the receipt should contain "<mandatory_field>"
+
+    Examples:
+      | format  | mandatory_field          |
+      | digital | B-Connect Txn ID         |
+      | digital | Consumer Convenience Fee |
+      | digital | B Assured logo           |
+      | paper   | B-Connect Txn ID         |
+      | paper   | Consumer Convenience Fee |
+      | paper   | B Assured logo           |
+
+  Scenario: Receipt download and share
+    Given the customer is on a result screen or a transaction detail view
+    When the customer taps "Download"
+    Then the SDK should generate the receipt file
+    And the file should be handed to the host for saving or sharing as per platform capability
+
+  Scenario: Host support details appear on the receipt footer
+    Given the host supplied support contact details in configuration
+    When a receipt is generated
+    Then the footer should show the host bank name, toll free number and website
+
+
+# =============================================================================
+# FEATURE 6: My Billers module - add, view, modify, delete, autopay
+# =============================================================================
+
+Feature: My Billers module - add, view, modify, delete, autopay
+  As a customer using the Bharat Connect SDK
+  I want to add, view, modify and delete my saved billers and manage autopay
+  So that my repeat bill payments are quick and under my control
+
+  Background:
+    Given the host application has integrated the Bharat Connect SDK
+    And the SDK has been initialised with a valid partner configuration
+    And the SDK has received a valid authenticated customer session from the host application
+
+  Scenario: My Billers list
+    When the customer opens the My Billers module
+    Then the SDK should list saved billers with serial number, biller name, authenticator, status, autopay toggle and an action menu
+    And the SDK should display an "Add Biller" button
+    And the SDK should display notes explaining biller statuses
+    And the Bharat Connect logo should be displayed in the top right-hand corner
+
+  Scenario: My Billers empty state
+    Given the customer has no saved billers
+    When the customer opens My Billers
+    Then the SDK should display an empty state illustration with an "Add Biller" button
+
+  Scenario Outline: Biller registration statuses
+    Given a biller is saved with registration status "<status>"
+    When the My Billers list is displayed
+    Then the biller should show the status "<status>"
+    And the SDK should "<behaviour>"
+
+    Examples:
+      | status                    | behaviour                                          |
+      | Active                    | allow fetch and pay for this biller                |
+      | Pending for authorization | block fetch and pay until the biller confirms      |
+      | Rejected                  | show the rejection and allow only modify or delete |
+
+  Scenario: Add biller with required details
+    Given the customer is on My Billers
+    When the customer taps "Add Biller"
+    Then the SDK should show a form with category, biller, the biller specific parameters and a nickname
+    And the form should include an "Autopay bills for this biller" toggle if the biller supports autopay
+    And the consent note should be displayed
+
+  Scenario: Biller added successfully
+    Given the customer has entered valid details in the Add Biller form
+    When the customer confirms the details on the review view
+    Then the SDK should register the biller with Bharat Connect
+    And the SDK should show "Biller Added Successfully" with nickname, biller ID, registration date, status, biller account ID, unique registration number, autopay status and payment channel
+    And the customer should be able to return to Home
+
+  Scenario: Review details before adding
+    Given the customer has filled the Add Biller form
+    When the customer taps "Add Biller"
+    Then the SDK should show a review view with all entered values
+    And the customer should confirm before the biller is registered
+
+  Scenario: Add biller that already exists
+    Given the biller with the same parameters is already saved
+    When the customer tries to add it again
+    Then the SDK should show "This biller is already marked as a favourite"
+    And no duplicate entry should be created
+
+  Scenario Outline: Add biller failure scenarios
+    When the biller registration fails with "<reason>"
+    Then the SDK should show an "Add Biller Failed" view with the message "<message>"
+    And the customer should be able to retry or go back
+
+    Examples:
+      | reason             | message                                    |
+      | invalid parameters | The details provided could not be verified |
+      | biller unavailable | Biller is currently unavailable            |
+      | rejected by biller | The biller rejected this registration      |
+      | network timeout    | Request timed out. Please try again        |
+
+  Scenario: Nickname is validated
+    When the customer enters a nickname longer than the allowed length or with unsupported characters
+    Then the SDK should show an inline validation error
+    And the biller should not be added
+
+  Scenario: View biller details
+    Given a saved biller exists
+    When the customer chooses "View Details" from the action menu
+    Then the SDK should show the biller parameters, nickname and autopay status in read-only form
+
+  Scenario: Modify biller details
+    Given a saved biller exists
+    When the customer chooses "Modify Details" and edits the nickname
+    And the customer taps "Modify"
+    Then the SDK should show the updated details for confirmation
+    And on confirmation the SDK should update the biller and refresh the list
+
+  Scenario: Biller category and biller are not editable on modify
+    When the customer opens "Modify Details"
+    Then the category and biller fields should not be changeable
+    And only fields permitted by the biller MDM should be editable
+
+  Scenario: Delete biller with confirmation
+    Given a saved biller exists
+    When the customer chooses "Delete" from the action menu
+    Then the SDK should show a confirmation with nickname, biller account ID and account number
+    When the customer taps "Confirm & Delete"
+    Then the SDK should remove the biller and any autopay mandate linked to it
+    And the SDK should show "Biller Deleted Successfully" with a "Download" option
+
+  Scenario: Delete is cancelled
+    When the customer closes the delete confirmation without confirming
+    Then the biller should remain in My Billers
+
+  Scenario Outline: Autopay toggle behaviour
+    Given a saved biller "<support>" autopay
+    When the customer views the autopay toggle
+    Then the toggle should be "<state>"
+
+    Examples:
+      | support          | state                   |
+      | supports         | enabled                 |
+      | does not support | disabled with a tooltip |
+
+  Scenario: Enable autopay on a saved biller
+    Given the customer has an Active biller that supports autopay
+    When the customer turns the autopay toggle on
+    Then the SDK should ask the customer to authorise the mandate
+    And on success the toggle should show ON
+
+  Scenario: Disable autopay on a saved biller
+    Given autopay is ON for a biller
+    When the customer turns the toggle off and confirms
+    Then the SDK should cancel the mandate
+    And the toggle should show OFF
+
+  Scenario: My Billers pagination
+    Given the customer has more billers than the page size
+    When the customer changes the rows-per-page value or moves to the next page
+    Then the list should update accordingly
+
+
+# =============================================================================
+# FEATURE 7: Payments module - transaction history and status query
+# =============================================================================
+
+Feature: Payments module - transaction history and status query
+  As a customer using the Bharat Connect SDK
+  I want to view my transaction history and query the status of a payment
+  So that I can track and verify all my bill payments
+
+  Background:
+    Given the host application has integrated the Bharat Connect SDK
+    And the SDK has been initialised with a valid partner configuration
+    And the SDK has received a valid authenticated customer session from the host application
+
+  Scenario: Recent transactions list
+    When the customer opens the Payments module
+    Then the SDK should show a "Recent Transactions" list with serial number, biller, account details, amount, date, payment status and an action menu
+    And the SDK should show a date range filter and a search box
+    And the Bharat Connect logo should be displayed in the top right-hand corner
+
+  Scenario: No transactions available
+    Given the customer has made no payments
+    When the customer opens the Payments module
+    Then the SDK should show "No transactions found"
+
+  Scenario: Filter transactions by date range
+    Given the customer is on the Payments module
+    When the customer selects a from date and a to date and taps "Submit"
+    Then only transactions within the range should be listed
+
+  Scenario Outline: Date range validation
+    When the customer selects from date "<from>" and to date "<to>"
+    Then the SDK should "<result>"
+
+    Examples:
+      | from       | to         | result                                          |
+      | 01/06/2025 | 30/06/2025 | show matching transactions                      |
+      | 30/06/2025 | 01/06/2025 | show "To date cannot be before From date"       |
+      | 01/01/2024 | 30/06/2025 | show "Select a range within the allowed period" |
+      | (empty)    | 30/06/2025 | show "Select From date"                         |
+
+  Scenario: Filter transactions by status
+    When the customer filters by status "Success", "Failed" or "Pending"
+    Then only transactions with the chosen status should be displayed
+
+  Scenario: Search transactions
+    When the customer types a biller name or account number in the search box
+    Then the list should show only matching transactions
+
+  Scenario Outline: Transaction status chips
+    Given a transaction has status "<status>"
+    When it is displayed in the list
+    Then the status chip should show "<label>" with the matching colour cue and text label
+
+    Examples:
+      | status  | label   |
+      | Success | SUCCESS |
+      | Failed  | FAILED  |
+      | Pending | PENDING |
+
+  Scenario Outline: Transaction action menu
+    Given a transaction with status "<status>" is listed
+    When the customer opens its action menu
+    Then the available actions should be "<actions>"
+
+    Examples:
+      | status  | actions                                       |
+      | Success | Repeat Payment, Raise Complaint, View Details |
+      | Failed  | Repeat Payment, Raise Complaint, View Details |
+      | Pending | Raise Complaint, View Details                 |
+
+  Scenario: View transaction details
+    Given a transaction is listed
+    When the customer chooses "View Details"
+    Then the SDK should show the Bharat Connect logo in the details header
+    And the SDK should show subscriber number, payment status, biller status, payment amount, CCF, transaction date and time, transaction reference number, payment type and payment method
+    And the SDK should provide a "Download" action for the receipt
+    And the B Assured logo should be displayed only for successful transactions
+
+  Scenario: Repeat a previous payment
+    Given a past transaction exists
+    When the customer chooses "Repeat Payment"
+    Then the SDK should open the fetch or payment view pre-filled with the same biller and customer parameters
+    And the customer should still authenticate before the payment is made
+
+  Scenario: Check transaction status using mobile number and date range
+    Given the customer is on the Transaction Status Query screen
+    When the customer enters a mobile number with a from and to date and taps "Submit"
+    Then the SDK should show the matching transactions with their latest status
+
+  Scenario: Check transaction status using transaction reference ID
+    When the customer enters a valid transaction reference ID and taps "Submit"
+    Then the SDK should show the transaction and its latest status
+
+  Scenario: Transaction query with insufficient input
+    When the customer submits without a mobile number or a transaction reference ID
+    Then the SDK should show "Enter mobile number or transaction reference ID"
+
+  Scenario: Transactions pagination
+    Given there are more transactions than the page size
+    When the customer navigates pages or changes rows per page
+    Then the list should update and the range text such as "1-5 of 12" should be correct
+
+
+# =============================================================================
+# FEATURE 8: Complaints module - raise, track status and history
+# =============================================================================
+
+Feature: Complaints module - raise, track status and history
+  As a customer using the Bharat Connect SDK
+  I want to raise complaints, track their status and view my complaint history
+  So that any issue with a bill payment gets reported and resolved
+
+  Background:
+    Given the host application has integrated the Bharat Connect SDK
+    And the SDK has been initialised with a valid partner configuration
+    And the SDK has received a valid authenticated customer session from the host application
+
+# (Not present in the sample screens. Designed here following the Bharat Connect
+#  complaint management logo rule and standard complaint fields.)
+
+  Scenario: Complaints module landing
+    When the customer opens the Complaints module
+    Then the SDK should offer "Raise Complaint", "Check Complaint Status" and "Complaint History"
+    And the Bharat Connect logo should be displayed in the top right-hand corner
+
+  Scenario: Raise complaint form
+    When the customer opens "Raise Complaint"
+    Then the SDK should display the fields "Mobile Number", "Type of Complaint", "Participation Type", "Reason" and "Description"
+    And "Type of Complaint" should offer "Transaction" and "Service"
+    And the Bharat Connect logo should be displayed in the top right-hand corner
+
+  Scenario Outline: Complaint form changes with complaint type
+    Given the customer is on the Raise Complaint form
+    When the customer selects the complaint type "<type>"
+    Then the SDK should show "<fields>"
+
+    Examples:
+      | type        | fields                                                                     |
+      | Transaction | Transaction Reference ID, Reason for transaction, Description              |
+      | Service     | Participation Type (Biller or Agent), Biller or Agent, Reason, Description |
+
+  Scenario: Raise a transaction complaint successfully
+    Given the customer has selected the complaint type "Transaction"
+    And the customer has entered a valid transaction reference ID, reason and description
+    When the customer taps "Submit"
+    Then the SDK should create the complaint with Bharat Connect
+    And the SDK should show a confirmation with the complaint ID, date and expected resolution timeline
+    And the SDK should call "onComplaintRaised" with the complaint ID
+
+  Scenario: Raise a service complaint successfully
+    Given the customer has selected the complaint type "Service"
+    And the customer has chosen a participation type, a reason and entered a description
+    When the customer taps "Submit"
+    Then the SDK should show a confirmation with the complaint ID
+
+  Scenario Outline: Raise complaint validations
+    Given the customer is on the Raise Complaint form
+    When the customer leaves "<field>" as "<value>" and taps "Submit"
+    Then the SDK should show the inline error "<message>"
+    And the complaint should not be created
+
+    Examples:
+      | field                    | value           | message                               |
+      | Mobile Number            | empty           | Mobile number is required             |
+      | Mobile Number            | 12345           | Enter a valid 10 digit number         |
+      | Type of Complaint        | not selected    | Select the type of complaint          |
+      | Transaction Reference ID | empty           | Transaction reference ID is required  |
+      | Transaction Reference ID | unknown ID      | No transaction found for this ID      |
+      | Reason                   | not selected    | Select a reason                       |
+      | Description              | empty           | Description is required               |
+      | Description              | over max length | Description exceeds the allowed limit |
+
+  Scenario: Raise complaint from a transaction in history
+    Given the customer is viewing a transaction in the Payments module
+    When the customer chooses "Raise Complaint"
+    Then the SDK should open the Raise Complaint form with type "Transaction"
+    And the transaction reference ID and mobile number should be pre-filled and read-only
+
+  Scenario: Duplicate complaint for the same transaction
+    Given an open complaint already exists for a transaction
+    When the customer raises another complaint for the same transaction
+    Then the SDK should show the existing complaint ID
+    And the SDK should not create a duplicate
+
+  Scenario: Complaint submission fails
+    When the complaint request fails due to a network or server error
+    Then the SDK should show "We could not register your complaint. Please try again."
+    And the entered data should be retained in the form
+
+  Scenario: Check complaint status
+    Given the customer is on "Check Complaint Status"
+    When the customer enters a valid complaint ID, selects the type of complaint and taps "Submit"
+    Then the SDK should show the complaint status, last updated time and the resolution remarks if available
+
+  Scenario Outline: Complaint status values
+    Given a complaint has status "<status>"
+    When the customer checks the status
+    Then the SDK should show "<display>"
+
+    Examples:
+      | status      | display                          |
+      | Registered  | Registered - awaiting assignment |
+      | In Progress | In Progress                      |
+      | Resolved    | Resolved with remarks            |
+      | Closed      | Closed                           |
+
+  Scenario: Check status with an invalid complaint ID
+    When the customer submits an unknown complaint ID
+    Then the SDK should show "No complaint found for this ID"
+
+  Scenario: Complaint history list
+    Given the customer has raised complaints earlier
+    When the customer opens "Complaint History"
+    Then the SDK should list complaints with serial number, complaint ID, type, date and status
+    And the customer should be able to filter by date range and status
+    And tapping a complaint should open its status details
+
+  Scenario: No complaints raised yet
+    Given the customer has not raised any complaint
+    When the customer opens "Complaint History"
+    Then the SDK should show "No complaints found"
+
+
+# =============================================================================
+# FEATURE 9: Non-functional, security, accessibility and compliance
+# =============================================================================
+
+Feature: Non-functional, security, accessibility and compliance
+  As a partner bank embedding the Bharat Connect SDK
+  I want the SDK to meet security, accessibility, language and compliance requirements
+  So that the integration can be certified by NPCI and rolled out safely to customers
+
+  Background:
+    Given the host application has integrated the Bharat Connect SDK
+    And the SDK has been initialised with a valid partner configuration
+    And the SDK has received a valid authenticated customer session from the host application
+
+  Scenario: Sensitive data is masked
+    When the SDK displays account numbers, mobile numbers or card digits
+    Then the values should be masked except for the permitted last digits
+
+  Scenario: No sensitive data in logs or screenshots
+    When the SDK logs diagnostics
+    Then OTPs, PINs, full account numbers and tokens should never be written to logs
+    And sensitive screens such as OTP verification should block screenshots where the platform supports it
+
+  Scenario: All network calls are secured
+    When the SDK communicates with the Bharat Connect or partner services
+    Then all calls should use TLS
+    And each request should carry a unique request ID for traceability
+
+  Scenario: Idle timeout
+    Given the customer has been inactive on the SDK for the host configured idle time
+    When the timeout is reached
+    Then the SDK should end the session and notify the host
+
+  Scenario: No internet connectivity
+    Given the device has no internet connection
+    When the customer performs any action that needs the network
+    Then the SDK should show "No internet connection" with a "Retry" option
+
+  Scenario: Accessibility support
+    When a customer uses a screen reader, large fonts or keyboard navigation
+    Then all controls should have accessible labels
+    And colour must not be the only indicator of status
+    And the Bharat Connect and B Assured logos should have alternative text
+
+  Scenario Outline: Language support
+    Given the host sets the SDK language to "<language>"
+    When any SDK screen is displayed
+    Then all SDK text should appear in "<language>"
+    But the "Bharat Connect" and "B Assured" brand marks should remain unchanged
+
+    Examples:
+      | language |
+      | English  |
+      | Hindi    |
+      | Bengali  |
+
+  Scenario: Brand asset kit is versioned with the SDK
+    Given NPCI publishes updated brand assets or sonic audio
+    When the host upgrades to the latest SDK version
+    Then the SDK should ship the updated assets
+    And the SDK should expose its version and brand asset version to the host
+
+  Scenario: Brand compliance checklist for certification
+    When the host submits the integration for NPCI certification
+    Then the following should be verifiable:
+      | check                                                                               |
+      | B mnemonic present at the entry point of the bill payment section                   |
+      | Bharat Connect logo on biller selection, fetch, payment, history, complaint screens |
+      | Logos in the top right-hand corner with minimum 20 px height                        |
+      | B Assured logo on payment confirmation and receipts only for success                |
+      | B Assured minimum 30 px, white background on confirmation page                      |
+      | Sonic branding played with B Assured on success screen                              |
+      | B-Connect Txn ID and CCF present on every receipt                                   |

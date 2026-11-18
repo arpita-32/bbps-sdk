@@ -1,0 +1,6 @@
+{
+  "name": "Bharat Connect SDK Prototype",
+  "description": "Interactive prototype of the NPCI Bharat Connect (BBPS) embedded bill payment SDK for partner banks, covering Stage 1-3 branding, bill fetch & pay, My Billers, payments, and complaints.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
